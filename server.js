@@ -1,11 +1,10 @@
 require("dotenv").config();
-require("./config/db");
+const sequelize = require("./config/db");
 
 const express   = require("express");
 const cors      = require("cors");
 const helmet    = require("helmet");
 const morgan    = require("morgan");
-const mongoose  = require("mongoose");
 
 const authRoutes     = require("./routes/authRoutes");
 const waterDataRoutes = require("./routes/waterDataRoutes");
@@ -36,11 +35,11 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  if (err.name === "ValidationError" || err.name === "CastError") {
-    return res.status(400).json({ error: err.message });
-  }
-  if (err.code === 11000) {
+  if (err.name === "SequelizeUniqueConstraintError" || err.parent?.code === "23505") {
     return res.status(409).json({ error: "Duplicate key error" });
+  }
+  if (err.name === "SequelizeValidationError" || err.name === "SequelizeDatabaseError") {
+    return res.status(400).json({ error: err.message });
   }
 
   const status = err.status || 500;
@@ -54,23 +53,28 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: message });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`
+async function init() {
+  await sequelize.sync();
+  const server = app.listen(PORT, () => {
+    console.log(`
 ╔══════════════════════════════════════════════╗
-║   Smart Fish Farm — Server (MongoDB)         ║
+║   Smart Fish Farm — Server (PostgreSQL)      ║
 ║   http://localhost:${PORT}                      ║
 ╚══════════════════════════════════════════════╝
 
   Run seed.js to create admin user.
-  `);
-});
+    `);
+  });
 
-async function shutdown() {
-  console.log("\n[Server] Shutting down...");
-  server.close();
-  await mongoose.connection.close();
-  console.log("[Server] Exiting");
-  process.exit(0);
+  async function shutdown() {
+    console.log("\n[Server] Shutting down...");
+    server.close();
+    await sequelize.close();
+    console.log("[Server] Exiting");
+    process.exit(0);
+  }
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+
+init();

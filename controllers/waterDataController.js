@@ -1,3 +1,5 @@
+const { Op } = require("sequelize");
+const sequelize = require("../config/db");
 const Reading = require("../models/Reading");
 const Alert   = require("../models/Alert");
 const getWaterStatus = require("../utils/waterStatus");
@@ -57,16 +59,19 @@ async function ingestData(req, res) {
 }
 
 async function getLatestAll(req, res) {
-  const devices = await Reading.aggregate([
-    { $sort: { timestamp: -1 } },
-    { $group: { _id: "$device_id", doc: { $first: "$$ROOT" } } },
-    { $replaceRoot: { newRoot: "$doc" } },
-  ]);
+  const [devices] = await sequelize.query(`
+    SELECT DISTINCT ON (device_id) *
+    FROM "Readings"
+    ORDER BY device_id, timestamp DESC
+  `);
   res.json({ devices, count: devices.length });
 }
 
 async function getLatestByDevice(req, res) {
-  const reading = await Reading.findOne({ device_id: req.params.device_id }).sort({ timestamp: -1 });
+  const reading = await Reading.findOne({
+    where: { device_id: req.params.device_id },
+    order: [["timestamp", "DESC"]],
+  });
   if (!reading) throw new AppError(404, "Device not found");
   res.json(reading);
 }
@@ -86,19 +91,21 @@ async function getHistory(req, res) {
     if (from) {
       const d = new Date(from);
       if (isNaN(d.getTime())) throw new AppError(400, "Invalid from date");
-      filter.timestamp.$gte = d;
+      filter.timestamp[Op.gte] = d;
     }
     if (to) {
       const d = new Date(to);
       if (isNaN(d.getTime())) throw new AppError(400, "Invalid to date");
-      filter.timestamp.$lte = d;
+      filter.timestamp[Op.lte] = d;
     }
   }
 
-  const rows = await Reading.find(filter)
-    .select("device_id ph tds temperature turbidity dissolved_oxygen status timestamp -_id")
-    .sort({ timestamp: -1 })
-    .limit(safeLimit);
+  const rows = await Reading.findAll({
+    where: filter,
+    attributes: ["device_id", "ph", "tds", "temperature", "turbidity", "dissolved_oxygen", "status", "timestamp"],
+    order: [["timestamp", "DESC"]],
+    limit: safeLimit,
+  });
 
   res.json({ history: rows.reverse(), count: rows.length });
 }

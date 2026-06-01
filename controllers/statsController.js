@@ -1,12 +1,16 @@
+const { Op } = require("sequelize");
 const Reading = require("../models/Reading");
 
 async function getStats(req, res) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const data = await Reading.find({
-    device_id: req.params.device_id,
-    timestamp: { $gte: since },
-  }).select("ph tds temperature turbidity dissolved_oxygen timestamp");
+  const data = await Reading.findAll({
+    where: {
+      device_id: req.params.device_id,
+      timestamp: { [Op.gte]: since },
+    },
+    attributes: ["ph", "tds", "temperature", "turbidity", "dissolved_oxygen", "timestamp"],
+  });
 
   if (!data.length) return res.json({ message: "No data in 24h" });
 

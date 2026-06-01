@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt    = require("jsonwebtoken");
+const { Op } = require("sequelize");
 const User   = require("../models/User");
 const AppError = require("../utils/appError");
 
@@ -21,7 +22,7 @@ async function register(req, res) {
     throw new AppError(400, "Password too long");
   }
 
-  const existing = await User.findOne({ username }).select("_id");
+  const existing = await User.findOne({ where: { username }, attributes: ["id"] });
   if (existing) throw new AppError(409, "Username already exists");
 
   const hash = await bcrypt.hash(password, 10);
@@ -43,7 +44,7 @@ async function login(req, res) {
     throw new AppError(400, "Username and password required");
   }
 
-  const user = await User.findOne({ username });
+  const user = await User.findOne({ where: { username } });
   if (!user) throw new AppError(401, "Invalid username or password");
 
   const ok = await bcrypt.compare(password, user.password);
@@ -63,7 +64,7 @@ async function login(req, res) {
 }
 
 async function me(req, res) {
-  const user = await User.findById(req.user.id).select("username role created_at");
+  const user = await User.findByPk(req.user.id, { attributes: ["username", "role", "created_at"] });
   if (!user) throw new AppError(404, "User not found");
   res.json(user);
 }
@@ -80,25 +81,28 @@ async function changePassword(req, res) {
     throw new AppError(400, "New password too long");
   }
 
-  const user = await User.findById(req.user.id);
+  const user = await User.findByPk(req.user.id);
   if (!user) throw new AppError(404, "User not found");
 
   const ok = await bcrypt.compare(oldPassword, user.password);
   if (!ok) throw new AppError(401, "Old password is incorrect");
 
   const hash = await bcrypt.hash(newPassword, 10);
-  await User.findByIdAndUpdate(req.user.id, { password: hash });
+  await User.update({ password: hash }, { where: { id: req.user.id } });
 
   res.json({ message: "Password changed successfully" });
 }
 
 async function listUsers(req, res) {
-  const users = await User.find().select("username role created_at").sort({ created_at: -1 });
+  const users = await User.findAll({
+    attributes: ["username", "role", "created_at"],
+    order: [["created_at", "DESC"]],
+  });
   res.json(users);
 }
 
 async function deleteUser(req, res) {
-  const user = await User.findByIdAndDelete(req.params.id);
+  const user = await User.destroy({ where: { id: req.params.id } });
   if (!user) throw new AppError(404, "User not found");
   res.json({ message: "User deleted" });
 }
@@ -109,7 +113,7 @@ async function forgotPassword(req, res) {
     throw new AppError(400, "Username is required");
   }
 
-  const user = await User.findOne({ username });
+  const user = await User.findOne({ where: { username } });
   if (!user) {
     throw new AppError(404, "No account with that username");
   }
@@ -135,8 +139,10 @@ async function resetPassword(req, res) {
   }
 
   const user = await User.findOne({
-    resetPasswordToken: token,
-    resetPasswordExpires: { $gt: Date.now() },
+    where: {
+      resetPasswordToken: token,
+      resetPasswordExpires: { [Op.gt]: new Date() },
+    },
   });
   if (!user) {
     throw new AppError(400, "Token is invalid or has expired");

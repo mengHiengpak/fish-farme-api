@@ -1,23 +1,26 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/db");
 
-const alertSchema = new mongoose.Schema({
+const Alert = sequelize.define("Alert", {
   device_id: {
-    type: String,
-    required: true,
-    index: true,
-    trim: true,
+    type: DataTypes.STRING,
+    allowNull: false,
   },
-  message:   String,
+  message: DataTypes.STRING,
   severity: {
-    type: String,
-    enum: ["WARNING", "DANGER"],
+    type: DataTypes.ENUM("WARNING", "DANGER"),
   },
   timestamp: {
-    type: Date,
-    default: Date.now,
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
   },
-}, { versionKey: false });
+}, {
+  timestamps: false,
+  tableName: "Alerts",
+  indexes: [
+    { fields: ["device_id"] },
+    { fields: ["timestamp"] },
+  ],
+});
 
-alertSchema.index({ timestamp: -1 });
-
-module.exports = mongoose.model("Alert", alertSchema);
+module.exports = Alert;

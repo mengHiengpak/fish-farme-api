@@ -1,34 +1,41 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/db");
 
-const readingSchema = new mongoose.Schema({
+const Reading = sequelize.define("Reading", {
   device_id: {
-    type: String,
-    required: true,
-    index: true,
-    trim: true,
+    type: DataTypes.STRING,
+    allowNull: false,
   },
-  ph:               Number,
-  tds:              Number,
-  temperature:      Number,
-  turbidity:        Number,
-  dissolved_oxygen: Number,
-  aerator:          Boolean,
-  pump_main:        Boolean,
-  pump_drain:       Boolean,
-  pump_dosing:      Boolean,
-  pump_fresh:       Boolean,
-  feed_count_today: Number,
-  feeding_active:   Boolean,
-  water_level:      Number,
-  pump_level:       Boolean,
-  status:           String,
-  issues:           [String],
+  ph: DataTypes.FLOAT,
+  tds: DataTypes.FLOAT,
+  temperature: DataTypes.FLOAT,
+  turbidity: DataTypes.FLOAT,
+  dissolved_oxygen: DataTypes.FLOAT,
+  aerator: DataTypes.BOOLEAN,
+  pump_main: DataTypes.BOOLEAN,
+  pump_drain: DataTypes.BOOLEAN,
+  pump_dosing: DataTypes.BOOLEAN,
+  pump_fresh: DataTypes.BOOLEAN,
+  feed_count_today: DataTypes.INTEGER,
+  feeding_active: DataTypes.BOOLEAN,
+  water_level: DataTypes.FLOAT,
+  pump_level: DataTypes.BOOLEAN,
+  status: DataTypes.STRING,
+  issues: {
+    type: DataTypes.ARRAY(DataTypes.STRING),
+    defaultValue: [],
+  },
   timestamp: {
-    type: Date,
-    default: Date.now,
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
   },
-}, { versionKey: false });
+}, {
+  timestamps: false,
+  tableName: "Readings",
+  indexes: [
+    { fields: ["device_id"] },
+    { fields: ["device_id", "timestamp"] },
+  ],
+});
 
-readingSchema.index({ device_id: 1, timestamp: -1 });
-
-module.exports = mongoose.model("Reading", readingSchema);
+module.exports = Reading;

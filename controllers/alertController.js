@@ -8,7 +8,11 @@ async function getAlerts(req, res) {
   const filter = {};
   if (device_id) filter.device_id = device_id;
 
-  const rows = await Alert.find(filter).sort({ timestamp: -1 }).limit(safeLimit);
+  const rows = await Alert.findAll({
+    where: filter,
+    order: [["timestamp", "DESC"]],
+    limit: safeLimit,
+  });
   res.json({ alerts: rows, count: rows.length });
 }
 
@@ -17,8 +21,8 @@ async function deleteAlerts(req, res) {
   const filter = {};
   if (device_id) filter.device_id = device_id;
 
-  const result = await Alert.deleteMany(filter);
-  res.json({ message: "Alerts deleted", deleted: result.deletedCount });
+  const result = await Alert.destroy({ where: filter });
+  res.json({ message: "Alerts deleted", deleted: result });
 }
 
 module.exports = { getAlerts, deleteAlerts };
